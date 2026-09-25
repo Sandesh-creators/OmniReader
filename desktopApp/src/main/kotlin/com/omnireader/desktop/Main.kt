@@ -181,7 +181,7 @@ fun main() = application {
                         Destination.Settings -> SettingsScreen(
                             controller = controller,
                             onBack = { destination = Destination.Home },
-                            appVersion = "1.0.0"
+                            appVersion = "1.0.1"
                         )
                     }
                 }
