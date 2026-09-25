@@ -57,20 +57,26 @@ class ProcessSpeechBackend : SpeechBackend {
 
     override fun initialize(onReady: () -> Unit) {
         if (!tempDir.isDirectory) tempDir.mkdirs()
-        if (isWindows) {
-            player = listOf("powershell.exe")
-        } else {
-            spdSay = findCommand("spd-say")
-            if (spdSay == null) {
-                espeak = findCommand("espeak-ng") ?: findCommand("espeak")
-                player = findPlayer()
-            }
-        }
+        resolveEngine()
         onReady()
+    }
+
+    private fun resolveEngine() {
+        if (isWindows) {
+            if (player == null) player = listOf("powershell.exe")
+            return
+        }
+        if (spdSay != null || espeak != null) return
+        spdSay = findCommand("spd-say")
+        if (spdSay == null) {
+            espeak = findCommand("espeak-ng") ?: findCommand("espeak")
+            player = findPlayer()
+        }
     }
 
     override fun speak(text: String, rate: Float, pitch: Float, onDone: () -> Unit, onError: () -> Unit) {
         stop()
+        resolveEngine()
 
         val commands = buildCommands(text, rate, pitch)
         if (commands.isEmpty()) {

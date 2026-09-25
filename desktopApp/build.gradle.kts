@@ -103,6 +103,7 @@ val packageDeb by tasks.registering {
     group = "compose desktop"
     description = "Builds a .deb package using dpkg-deb."
     dependsOn("createDistributable")
+    inputs.dir(appImageSourceDir)
     outputs.dir(nativeOutputDir)
 
     doLast {
@@ -158,6 +159,8 @@ val packageRpm by tasks.registering {
     group = "compose desktop"
     description = "Builds an .rpm package using rpmbuild."
     dependsOn("createDistributable")
+    inputs.dir(appImageSourceDir)
+    inputs.file(file("packaging/omnireader.spec"))
     outputs.dir(nativeOutputDir)
 
     doLast {
@@ -201,6 +204,8 @@ val packageAppImage by tasks.registering {
     group = "compose desktop"
     description = "Builds a portable AppImage using mksquashfs and the bundled type-2 runtime."
     dependsOn("createDistributable")
+    inputs.dir(appImageSourceDir)
+    inputs.file(file("tools/appimage-runtime"))
     outputs.dir(nativeOutputDir)
 
     doLast {
