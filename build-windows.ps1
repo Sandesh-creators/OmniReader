@@ -114,10 +114,9 @@ try {
     Write-Host "Could not rasterize icon: $($_.Exception.Message)" -ForegroundColor Yellow
 }
 
-$resourceArgs = @(
-    "--add-modules", "java.instrument,java.management,jdk.unsupported,java.net.http,java.sql"
-)
-if (Test-Path $iconPath) { $resourceArgs = @("--icon", $iconPath) + $resourceArgs }
+$resourceArgs = @()
+if (Test-Path $iconPath) { $resourceArgs = @("--icon", $iconPath) }
+$appImageModuleArgs = @("--add-modules", "java.instrument,java.management,jdk.unsupported,java.net.http,java.sql")
 
 $commonArgs = @(
     "--name", "OmniReader",
@@ -146,7 +145,7 @@ if ($Msi) {
 }
 
 if ($Exe) {
-    $exeArgs = $commonArgs + @(
+    $exeArgs = $commonArgs + $appImageModuleArgs + @(
         "--type", "app-image",
         "--win-console", "omit"
     )
