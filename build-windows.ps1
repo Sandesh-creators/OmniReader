@@ -145,12 +145,16 @@ if ($Msi) {
 }
 
 if ($Exe) {
-    $exeArgs = $commonArgs + $appImageModuleArgs + @(
-        "--type", "app-image"
-    )
-    Write-Host "Building Windows EXE app-image..." -ForegroundColor Cyan
-    & "$env:JAVA_HOME\bin\jpackage.exe" @exeArgs
-    if ($LASTEXITCODE -ne 0) { Fail "EXE build failed." }
+    # The Compose plugin already produced a runnable Windows app-image
+    # (OmniReader.exe + bundled runtime) in createDistributable, so ship
+    # that as a portable zip instead of re-running jpackage.
+    $zipPath = Join-Path $ProjectRoot "desktopApp\build\compose\binaries\main\windows\OmniReader-$Version-windows-x64.zip"
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $zipPath) | Out-Null
+    if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
+    Write-Host "Zipping Windows EXE app-image..." -ForegroundColor Cyan
+    Compress-Archive -Path (Join-Path $appImageDir "*") -DestinationPath $zipPath -CompressionLevel Optimal
+    if (-not (Test-Path $zipPath)) { Fail "EXE zip failed." }
+    Write-Host ("Portable EXE archive: {0} ({1:N1} MB)" -f $zipPath, ((Get-Item $zipPath).Length / 1MB)) -ForegroundColor Green
 }
 
 $distDir = Join-Path $ProjectRoot "desktopApp\build\compose\binaries\main\windows"
