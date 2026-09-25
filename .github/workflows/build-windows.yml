@@ -49,8 +49,3 @@ jobs:
             Write-Host "attaching $($_.Name)"
             gh release upload $env:GITHUB_REF_NAME $_.FullName --clobber --repo $env:GITHUB_REPOSITORY
           }
-
-      - name: Attach installers on manual runs
-        if: github.event_name == 'workflow_dispatch' && inputs.upload_to_release && startsWith(github.ref, 'refs/tags/v')
-        shell: pwsh
-        run: Write-Host "manual run: release assets updated for $env:GITHUB_REF_NAME"
