@@ -29,11 +29,16 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v3
 
-      - name: Install WiX toolset for MSI
+      - name: Install WiX 3 toolset for MSI
         shell: pwsh
         run: |
-          choco install wix --version=3.14.1.0 -y --no-progress --allow-downgrade
-          if ($LASTEXITCODE -ne 0) { Write-Host "WiX install returned $LASTEXITCODE (may already be present)" }
+          $zip = Join-Path $env:RUNNER_TEMP "wix3.zip"
+          $dir = Join-Path $env:RUNNER_TEMP "wix3"
+          Invoke-WebRequest -Uri "https://github.com/wixtoolset/wix3/releases/download/wix3141rtm/wix314-binaries.zip" -OutFile $zip
+          Expand-Archive -Path $zip -DestinationPath $dir -Force
+          "WIX=$dir" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          $dir | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+          Write-Host "candle: $((Get-Command candle.exe).Source)"
 
       - name: Build Windows installers
         shell: pwsh
