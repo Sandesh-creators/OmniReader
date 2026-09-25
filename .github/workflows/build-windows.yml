@@ -1,0 +1,56 @@
+name: Build Windows
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      upload_to_release:
+        description: Attach the installers to the matching GitHub release
+        required: false
+        default: true
+        type: boolean
+
+jobs:
+  windows:
+    name: MSI and EXE
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v3
+
+      - name: Build Windows installers
+        shell: pwsh
+        run: ./build-windows.ps1 -Msi -Exe
+
+      - name: Upload installers as workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: omnireader-windows
+          path: desktopApp/build/compose/binaries/main/windows/**
+          if-no-files-found: error
+
+      - name: Attach installers to the release
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        run: |
+          $dir = "desktopApp\build\compose\binaries\main\windows"
+          Get-ChildItem -Path $dir -File | ForEach-Object {
+            Write-Host "attaching $($_.Name)"
+            gh release upload $env:GITHUB_REF_NAME $_.FullName --clobber --repo $env:GITHUB_REPOSITORY
+          }
+
+      - name: Attach installers on manual runs
+        if: github.event_name == 'workflow_dispatch' && inputs.upload_to_release && startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        run: Write-Host "manual run: release assets updated for $env:GITHUB_REF_NAME"

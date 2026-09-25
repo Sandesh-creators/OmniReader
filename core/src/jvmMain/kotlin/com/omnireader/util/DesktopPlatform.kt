@@ -54,6 +54,9 @@ class ProcessSpeechBackend : SpeechBackend {
     private var espeak: String? = null
     private var player: List<String>? = null
     private var activeProcess: Process? = null
+    private var piper: String? = null
+    private var piperModel: File? = null
+    private var ffmpeg: String? = null
 
     override fun initialize(onReady: () -> Unit) {
         if (!tempDir.isDirectory) tempDir.mkdirs()
@@ -62,16 +65,82 @@ class ProcessSpeechBackend : SpeechBackend {
     }
 
     private fun resolveEngine() {
+        if (isWindows && piper != null) return
+        if (!isWindows && (piper != null || spdSay != null || espeak != null)) return
+
+        piper = findPiper()
+        if (piper != null) {
+            piperModel = findPiperModel()
+            player = findPlayer()
+            ffmpeg = findCommand("ffmpeg")
+            return
+        }
+
         if (isWindows) {
             if (player == null) player = listOf("powershell.exe")
             return
         }
-        if (spdSay != null || espeak != null) return
+
         spdSay = findCommand("spd-say")
         if (spdSay == null) {
             espeak = findCommand("espeak-ng") ?: findCommand("espeak")
             player = findPlayer()
         }
+    }
+
+    private fun findPiper(): String? {
+        findCommand("piper")?.let { return it }
+        val home = System.getProperty("user.home")
+        val candidates = buildList {
+            ttsDir()?.let { dir ->
+                add("$dir/venv/bin/piper")
+                add("$dir/bin/piper")
+                add("$dir/piper")
+            }
+            add("$home/.local/share/omnireader/tts/venv/bin/piper")
+            add("$home/.local/share/omnireader/tts/piper")
+            add("$home/.local/bin/piper")
+            add("$home/.local/share/piper/piper")
+            add("$home/bin/piper")
+        }
+        return candidates
+            .map(::File)
+            .firstOrNull { it.isFile && it.canExecute() }
+            ?.absolutePath
+    }
+
+    private fun ttsDir(): String? {
+        val explicit = System.getenv("OMNIREADER_TTS_DIR")?.takeIf { it.isNotBlank() }
+        if (explicit != null) return explicit
+        val appTtsDir = File(System.getProperty("user.dir"), ".tts")
+        return if (appTtsDir.isDirectory) appTtsDir.absolutePath else null
+    }
+
+    private fun findPiperModel(): File? {
+        val home = System.getProperty("user.home")
+        val override = System.getenv("OMNIREADER_PIPER_VOICE")?.takeIf { it.isNotBlank() }
+        val voiceDirs = buildList {
+            ttsDir()?.let { add("$it/voices") }
+            add("$home/.local/share/omnireader/tts/voices")
+            add("$home/.local/share/piper/voices")
+            add("$home/.config/piper/voices")
+            add("$home/.local/share/omnireader/tts/piper-voices")
+        }
+
+        val models = voiceDirs
+            .map { File(it) }
+            .filter { it.isDirectory }
+            .flatMap { dir -> dir.listFiles()?.filter { it.name.endsWith(".onnx") }.orEmpty() }
+            .filter { File(it.parentFile, it.name + ".json").isFile || File(it.parentFile, it.name.replace(".onnx", ".onnx.json")).isFile }
+            .sortedBy { it.name }
+
+        if (models.isEmpty()) return null
+        override?.let { wanted ->
+            return models.firstOrNull { it.name.removeSuffix(".onnx") == wanted }
+                ?: models.firstOrNull { it.name.contains(wanted, ignoreCase = true) }
+                ?: models.first()
+        }
+        return models.firstOrNull { it.name.contains("en_US", ignoreCase = true) } ?: models.first()
     }
 
     override fun speak(text: String, rate: Float, pitch: Float, onDone: () -> Unit, onError: () -> Unit) {
@@ -121,6 +190,8 @@ class ProcessSpeechBackend : SpeechBackend {
     }
 
     private fun buildCommands(text: String, rate: Float, pitch: Float): List<List<String>> {
+        piper?.let { engine -> return buildPiperCommands(engine, text, rate, pitch) }
+
         if (isWindows) {
             val powerShell = player ?: return emptyList()
             textFile.writeText(text)
@@ -178,6 +249,54 @@ class ProcessSpeechBackend : SpeechBackend {
             ),
             playback + wav.absolutePath
         )
+    }
+
+    private fun buildPiperCommands(
+        engine: String,
+        text: String,
+        rate: Float,
+        pitch: Float
+    ): List<List<String>> {
+        val model = piperModel ?: return emptyList()
+        val playback = player ?: return emptyList()
+
+        val input = File(tempDir, "sentence.txt")
+        val rawWav = File(tempDir, "piper-raw.wav")
+        val wav = File(tempDir, "sentence.wav")
+        input.writeText(text)
+        runCatching { rawWav.delete() }
+        runCatching { wav.delete() }
+
+        val lengthScale = (1f / rate.coerceIn(0.5f, 2.0f))
+        val commands = mutableListOf<List<String>>()
+
+        commands += listOf(
+            engine,
+            "--model", model.absolutePath,
+            "--output-file", rawWav.absolutePath,
+            "--input-file", input.absolutePath,
+            "--length-scale", lengthScale.toString(),
+            "--sentence-silence", "0.15"
+        )
+
+        val ffmpegPath = ffmpeg
+        if (pitch != 1f && ffmpegPath != null) {
+            val shifted = File(tempDir, "piper-pitched.wav")
+            val factor = pitch.coerceIn(0.5f, 2.0f)
+            commands += listOf(
+                ffmpegPath,
+                "-y",
+                "-loglevel", "error",
+                "-i", rawWav.absolutePath,
+                "-filter:a", "asetrate=22050*$factor,aresample=22050,atempo=${1f / factor}",
+                shifted.absolutePath
+            )
+            commands += playback + shifted.absolutePath
+        } else {
+            commands += playback + rawWav.absolutePath
+        }
+
+        return commands
     }
 
     private fun findPlayer(): List<String>? {

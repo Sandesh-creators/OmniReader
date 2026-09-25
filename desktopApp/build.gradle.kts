@@ -80,7 +80,7 @@ fun stagePackage() {
 
     val optTarget = File(stage, "opt/OmniReader")
     optTarget.parentFile.mkdirs()
-    appImageSourceDir.get().asFile.copyRecursively(optTarget, overwrite = true)
+    copyTreePreservingPermissions(appImageSourceDir.get().asFile, optTarget)
 
     val iconFile = File(stage, "usr/share/icons/hicolor/256x256/apps/omnireader.png")
     iconFile.parentFile.mkdirs()
@@ -222,15 +222,21 @@ val packageAppImage by tasks.registering {
 
         val appRun = File(appDir, "AppRun")
         appRun.writeText(appRunContent)
-        appRun.setExecutable(true)
+        appRun.setReadable(true, false)
+        appRun.setWritable(true, false)
+        appRun.setExecutable(true, false)
 
-        File(appDir, "omnireader.desktop").writeText(desktopEntryContent)
+        val entryFile = File(appDir, "omnireader.desktop")
+        entryFile.writeText(desktopEntryContent)
+        entryFile.setReadable(true, false)
+        entryFile.setWritable(true, false)
+        entryFile.setExecutable(false, false)
 
         val iconFile = File(appDir, "usr/share/icons/hicolor/256x256/apps/omnireader.png")
         iconFile.parentFile.mkdirs()
         writeAppIcon(iconFile)
 
-        appImageSourceDir.get().asFile.copyRecursively(File(appDir, "OmniReader"), overwrite = true)
+        copyTreePreservingPermissions(appImageSourceDir.get().asFile, File(appDir, "OmniReader"))
 
         val squashfs = File(nativeOutputDir.get().asFile, "appimage-root.squashfs")
         squashfs.delete()
@@ -268,6 +274,24 @@ val packageAll by tasks.registering {
     group = "compose desktop"
     description = "Builds deb, rpm and AppImage packages."
     dependsOn(packageDeb, packageRpm, packageAppImage)
+}
+
+fun copyTreePreservingPermissions(source: File, target: File) {
+    target.deleteRecursively()
+    target.mkdirs()
+
+    source.walkTopDown().forEach { src ->
+        val dest = File(target, src.relativeTo(source).path)
+        if (src.isDirectory) {
+            dest.mkdirs()
+        } else {
+            dest.parentFile?.mkdirs()
+            src.copyTo(dest, overwrite = true)
+            dest.setReadable(true, false)
+            dest.setWritable(true, false)
+            dest.setExecutable(src.canExecute(), false)
+        }
+    }
 }
 
 fun writeAppIcon(target: File) {
