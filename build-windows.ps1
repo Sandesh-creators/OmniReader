@@ -138,7 +138,6 @@ if (-not $Msi -and -not $Exe) { $Msi = $true }
 if ($Msi) {
     $msiArgs = $commonArgs + @(
         "--type", "msi",
-        "--win-menu-entries",
         "--win-per-user-install"
     )
     Write-Host "Building MSI..." -ForegroundColor Cyan
