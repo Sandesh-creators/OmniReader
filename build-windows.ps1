@@ -146,8 +146,7 @@ if ($Msi) {
 
 if ($Exe) {
     $exeArgs = $commonArgs + $appImageModuleArgs + @(
-        "--type", "app-image",
-        "--win-console", "omit"
+        "--type", "app-image"
     )
     Write-Host "Building Windows EXE app-image..." -ForegroundColor Cyan
     & "$env:JAVA_HOME\bin\jpackage.exe" @exeArgs
