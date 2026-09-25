@@ -1,0 +1,138 @@
+name: Build & Deploy APK to Telegram
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Build Release APK (unsigned)
+        run: ./gradlew assembleRelease --no-daemon
+
+      - name: Find APK files
+        id: find-apk
+        run: |
+          DEBUG_APK=$(find app/build/outputs/apk/debug -name "*.apk" | head -1)
+          RELEASE_APK=$(find app/build/outputs/apk/release -name "*.apk" | head -1)
+          echo "debug_apk=$DEBUG_APK" >> $GITHUB_OUTPUT
+          echo "release_apk=$RELEASE_APK" >> $GITHUB_OUTPUT
+          echo "Debug APK: $DEBUG_APK"
+          echo "Release APK: $RELEASE_APK"
+
+      - name: Upload Debug APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: OmniReader-debug-${{ github.run_number }}
+          path: ${{ steps.find-apk.outputs.debug_apk }}
+          retention-days: 30
+
+      - name: Upload Release APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: OmniReader-release-${{ github.run_number }}
+          path: ${{ steps.find-apk.outputs.release_apk }}
+          retention-days: 30
+
+  deploy-to-telegram:
+    name: Send APK to Telegram
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Download Debug APK
+        uses: actions/download-artifact@v4
+        with:
+          name: OmniReader-debug-${{ github.run_number }}
+          path: ./apk
+
+      - name: Get APK info
+        id: apk-info
+        run: |
+          APK_FILE=$(find ./apk -name "*.apk" | head -1)
+          APK_SIZE=$(du -h "$APK_FILE" | cut -f1)
+          echo "apk_file=$APK_FILE" >> $GITHUB_OUTPUT
+          echo "apk_size=$APK_SIZE" >> $GITHUB_OUTPUT
+          echo "Found APK: $APK_FILE ($APK_SIZE)"
+
+      - name: Send APK to Telegram
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          APK_FILE="${{ steps.apk-info.outputs.apk_file }}"
+          APK_SIZE="${{ steps.apk-info.outputs.apk_size }}"
+          COMMIT_MSG=$(git log -1 --pretty=format:"%s")
+          BUILD_NUM="${{ github.run_number }}"
+          REPO="${{ github.repository }}"
+
+          # Send build notification
+          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -d chat_id="${TELEGRAM_CHAT_ID}" \
+            -d parse_mode="Markdown" \
+            -d text="🏗 *OmniReader Build #${BUILD_NUM}*
+
+📦 *APK Size:* ${APK_SIZE}
+📝 *Commit:* ${COMMIT_MSG}
+🔗 *Repo:* ${REPO}
+
+发送 APK 文件中..."
+
+          # Send APK file
+          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument" \
+            -F chat_id="${TELEGRAM_CHAT_ID}" \
+            -F document="@${APK_FILE}" \
+            -F caption="📱 OmniReader & TaskRunner v1.0.0 (Build #${BUILD_NUM})"
+
+          echo "APK sent to Telegram successfully!"
+
+      - name: Send success notification
+        if: success()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -d chat_id="${TELEGRAM_CHAT_ID}" \
+            -d parse_mode="Markdown" \
+            -d text="✅ *OmniReader Build #${{ github.run_number }}* 完成并已发送！
+
+📱 应用已准备就绪，可以安装使用。
+🔗 查看构建: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+      - name: Send failure notification
+        if: failure()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -d chat_id="${TELEGRAM_CHAT_ID}" \
+            -d parse_mode="Markdown" \
+            -d text="❌ *OmniReader Build #${{ github.run_number }}* 失败
+
+请检查 GitHub Actions 日志获取详细信息。
+🔗 ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"

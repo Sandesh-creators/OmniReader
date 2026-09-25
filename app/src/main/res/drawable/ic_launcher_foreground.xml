@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Book base -->
+    <path
+        android:pathData="M30,30 L78,30 C80,30 82,32 82,34 L82,78 C82,80 80,82 78,82 L30,82 C28,82 26,80 26,78 L26,34 C26,32 28,30 30,30 Z"
+        android:fillColor="#1565C0" />
+
+    <!-- Book spine -->
+    <path
+        android:pathData="M26,34 L26,78 C26,80 28,82 30,82 L30,30 C28,30 26,32 26,34 Z"
+        android:fillColor="#0D47A1" />
+
+    <!-- Book pages (white lines) -->
+    <path
+        android:pathData="M34,38 L74,38 L74,40 L34,40 Z"
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.8" />
+    <path
+        android:pathData="M34,44 L68,44 L68,46 L34,46 Z"
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.6" />
+    <path
+        android:pathData="M34,50 L72,50 L72,52 L34,52 Z"
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.6" />
+    <path
+        android:pathData="M34,56 L64,56 L64,58 L34,58 Z"
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.5" />
+    <path
+        android:pathData="M34,62 L70,62 L70,64 L34,64 Z"
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.4" />
+
+    <!-- Terminal prompt >_ -->
+    <path
+        android:pathData="M42,70 L48,66 L48,68 L44,70 L48,72 L48,74 Z"
+        android:fillColor="#00FF41" />
+    <path
+        android:pathData="M52,66 L52,74"
+        android:strokeColor="#00FF41"
+        android:strokeWidth="2"
+        android:strokeLineCap="round" />
+
+    <!-- Glow effect -->
+    <path
+        android:pathData="M44,68 L50,64 L50,66 L46,68 L50,70 L50,72 Z"
+        android:fillColor="#00FF41"
+        android:fillAlpha="0.3" />
+</vector>

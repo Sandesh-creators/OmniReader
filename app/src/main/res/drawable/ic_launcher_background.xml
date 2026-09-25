@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Background gradient -->
+    <path
+        android:pathData="M0,0 L108,0 L108,108 L0,108 Z"
+        android:fillColor="#6750A4" />
+
+    <!-- Subtle pattern -->
+    <path
+        android:pathData="M0,0 L108,0 L108,54 L0,54 Z"
+        android:fillColor="#7B61FF"
+        android:fillAlpha="0.3" />
+</vector>
