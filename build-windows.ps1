@@ -1,5 +1,5 @@
 param(
-    [string]$Version = "1.0.0",
+    [string]$Version = "",
     [switch]$Msi,
     [switch]$Exe
 )
@@ -12,6 +12,14 @@ function Fail($message) {
     Write-Host "ERROR: $message" -ForegroundColor Red
     exit 1
 }
+
+if ([string]::IsNullOrWhiteSpace($Version)) {
+    $gradleFile = Join-Path $ProjectRoot "desktopApp\build.gradle.kts"
+    $match = Select-String -Path $gradleFile -Pattern 'val appVersion = "([^"]+)"' | Select-Object -First 1
+    if ($match) { $Version = $match.Matches[0].Groups[1].Value }
+    else { Fail "Could not read appVersion from desktopApp\build.gradle.kts" }
+}
+Write-Host "Packaging version $Version" -ForegroundColor Cyan
 
 if (-not $env:JAVA_HOME) {
     $candidates = @(
@@ -59,7 +67,6 @@ New-Item -ItemType Directory -Force -Path $iconDir | Out-Null
 $iconPath = Join-Path $iconDir "omnireader.ico"
 $desktopPath = Join-Path $iconDir "omnireader.desktop"
 $setupPath = Join-Path $iconDir "setup.exe"
-$licensePath = Join-Path $iconDir "LICENSE.rtf"
 
 Set-Content -Path $desktopPath -Encoding UTF8 -Value @"
 [Desktop Entry]
@@ -75,10 +82,6 @@ Keywords=epub;reader;book;tts;
 "@
 
 Set-Content -Path $setupPath -Encoding ASCII -Value "OmniReader Setup Launcher placeholder."
-Set-Content -Path $licensePath -Encoding ASCII -Value @"
-{\rtf1\ansi OmniReader is distributed as-is. Use at your own risk.\par
-}
-"@
 
 $iconGenerated = $false
 try {
@@ -115,7 +118,6 @@ $resourceArgs = @(
     "--add-modules", "java.instrument,java.management,jdk.unsupported,java.net.http,java.sql"
 )
 if (Test-Path $iconPath) { $resourceArgs = @("--icon", $iconPath) + $resourceArgs }
-if (Test-Path $licensePath) { $resourceArgs += @("--license", $licensePath) }
 
 $commonArgs = @(
     "--name", "OmniReader",
