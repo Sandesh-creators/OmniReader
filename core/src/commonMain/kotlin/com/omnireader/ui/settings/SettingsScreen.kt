@@ -15,15 +15,18 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.TextFormat
+import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -51,13 +54,19 @@ import com.omnireader.viewmodel.AppController
 fun SettingsScreen(
     controller: AppController,
     onBack: () -> Unit,
-    appVersion: String = "1.0.0",
+    appVersion: String = "1.0.2",
     showExecutionSection: Boolean = false
 ) {
     val fontSize by controller.fontSize.collectAsState()
     val isNightMode by controller.isNightMode.collectAsState()
     val ttsState by controller.ttsState.collectAsState()
     val autoAdvanceChapters by controller.autoAdvanceChapters.collectAsState()
+
+    val gapSubtitle = when {
+        ttsState.sentenceGap <= 0.001f -> "None - continuous speech"
+        ttsState.sentenceGap < 1f -> "${"%.2f".format(ttsState.sentenceGap)}s between sentences"
+        else -> "${"%.1f".format(ttsState.sentenceGap)}s between sentences"
+    }
 
     Scaffold(
         topBar = {
@@ -149,6 +158,45 @@ fun SettingsScreen(
                             onCheckedChange = { controller.setAutoAdvanceChapters(it) }
                         )
                     }
+                )
+            }
+
+            SettingsSection(title = "Speech Rhythm") {
+                SettingsItem(
+                    icon = Icons.Filled.Timer,
+                    title = "Pause Between Sentences",
+                    subtitle = gapSubtitle,
+                    trailing = {
+                        Slider(
+                            value = ttsState.sentenceGap,
+                            onValueChange = { controller.setTtsSentenceGap(it) },
+                            valueRange = 0f..1.5f,
+                            steps = 14,
+                            modifier = Modifier.width(140.dp)
+                        )
+                    }
+                )
+
+                SettingsItem(
+                    icon = Icons.Filled.Bolt,
+                    title = "Pre-render Next Sentence",
+                    subtitle = if (ttsState.prefetchEnabled) {
+                        "Removes the pause between sentences"
+                    } else {
+                        "Renders each sentence only when it is needed"
+                    },
+                    trailing = {
+                        Switch(
+                            checked = ttsState.prefetchEnabled,
+                            onCheckedChange = { controller.setTtsPrefetch(it) }
+                        )
+                    }
+                )
+
+                SettingsItem(
+                    icon = Icons.Filled.RecordVoiceOver,
+                    title = "Voice Engine",
+                    subtitle = ttsState.engineName.ifBlank { "Detecting..." }
                 )
             }
 

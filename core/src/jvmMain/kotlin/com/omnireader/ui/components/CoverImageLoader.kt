@@ -8,7 +8,9 @@ import java.awt.image.BufferedImage
 import java.io.File
 import javax.imageio.ImageIO
 
-private const val MAX_COVER_EDGE = 1024
+// Covers are drawn at roughly card size, so decoding them at full resolution
+// only wasted heap (a 1600x2400 cover is ~15 MB as ARGB).
+private const val MAX_COVER_EDGE = 512
 
 actual suspend fun loadCoverImage(source: String): ImageBitmap? {
     val file = File(source.removePrefix("file://"))

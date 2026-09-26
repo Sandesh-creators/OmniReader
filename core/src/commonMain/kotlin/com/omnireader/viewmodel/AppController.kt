@@ -50,6 +50,10 @@ interface AppController {
 
     fun setTtsPitch(pitch: Float)
 
+    fun setTtsSentenceGap(gapSeconds: Float)
+
+    fun setTtsPrefetch(enabled: Boolean)
+
     fun setAutoAdvanceChapters(enabled: Boolean)
 
     fun loadFiles()

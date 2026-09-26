@@ -11,6 +11,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -72,6 +73,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -289,24 +291,29 @@ fun ReaderContent(
     onScrollPositionChange: (Float) -> Unit,
     coverSource: String? = null
 ) {
-    val scrollState = rememberScrollState()
+    val listState = rememberLazyListState()
 
     var readyToReport by remember { mutableStateOf(false) }
+
+    val sentences = remember(chapter.plainText) {
+        chapter.plainText.split(Regex("(?<=[.!?])\\s+")).filter { it.isNotBlank() }
+    }
 
     LaunchedEffect(chapter.index) {
         readyToReport = false
         onScrollPositionChange(0f)
-        val target = initialScrollPosition.toInt().coerceAtLeast(0)
+        val target = initialScrollPosition.toInt().coerceIn(0, sentences.lastIndex.coerceAtLeast(0))
         if (target > 0) {
-            runCatching { scrollState.scrollTo(target) }
+            runCatching { listState.scrollToItem(target) }
         }
         readyToReport = true
     }
 
-    LaunchedEffect(scrollState.value) {
-        if (readyToReport) {
-            onScrollPositionChange(scrollState.value.toFloat())
-        }
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.firstVisibleItemIndex }
+            .collect { index ->
+                if (readyToReport) onScrollPositionChange(index.toFloat())
+            }
     }
 
     val backgroundColor = if (isNightMode) Color(0xFF15151F) else Color(0xFFFDFCF9)
@@ -324,46 +331,49 @@ fun ReaderContent(
         animationSpec = tween(300)
     ).value
 
-    Column(
+    LazyColumn(
+        state = listState,
         modifier = Modifier
             .fillMaxSize()
             .background(backgroundColor)
-            .verticalScroll(scrollState)
-            .padding(20.dp)
-            .padding(bottom = 24.dp)
+            .padding(horizontal = 20.dp),
+        contentPadding = PaddingValues(top = 20.dp, bottom = 40.dp)
     ) {
         coverSource?.let {
-            CoverImage(
-                coverSource = it,
-                placeholderTitle = chapter.title,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 24.dp)
+            item(key = "cover") {
+                CoverImage(
+                    coverSource = it,
+                    placeholderTitle = chapter.title,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 24.dp)
+                )
+                HorizontalDivider(
+                    modifier = Modifier.padding(bottom = 16.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant
+                )
+            }
+        }
+
+        item(key = "title") {
+            Text(
+                text = chapter.title,
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                color = textColor,
+                modifier = Modifier.padding(bottom = 16.dp)
             )
+
             HorizontalDivider(
                 modifier = Modifier.padding(bottom = 16.dp),
                 color = MaterialTheme.colorScheme.outlineVariant
             )
         }
 
-        Text(
-            text = chapter.title,
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            color = textColor,
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
-
-        HorizontalDivider(
-            modifier = Modifier.padding(bottom = 16.dp),
-            color = MaterialTheme.colorScheme.outlineVariant
-        )
-
-        val sentences = remember(chapter.plainText) {
-            chapter.plainText.split(Regex("(?<=[.!?])\\s+")).filter { it.isNotBlank() }
-        }
-
-        sentences.forEachIndexed { index, sentence ->
+        itemsIndexed(
+            items = sentences,
+            key = { index, _ -> index }
+        ) { index, sentence ->
             val isHighlighted = index == highlightedSentence
 
             Text(
@@ -387,8 +397,6 @@ fun ReaderContent(
                     .padding(vertical = 2.dp)
             )
         }
-
-        Spacer(modifier = Modifier.height(32.dp))
     }
 }
 

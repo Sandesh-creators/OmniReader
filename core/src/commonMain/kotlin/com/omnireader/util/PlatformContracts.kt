@@ -30,6 +30,16 @@ interface SpeechBackend {
 
     fun speak(text: String, rate: Float, pitch: Float, onDone: () -> Unit, onError: () -> Unit)
 
+    /**
+     * Prepare audio for [text] ahead of time so that the following sentence
+     * can start playing without waiting for engine start-up. Backends that
+     * cannot pre-render may ignore this.
+     */
+    fun prefetch(text: String, rate: Float, pitch: Float) {}
+
+    /** Human readable name of the engine actually in use, for the settings screen. */
+    fun engineName(): String = ""
+
     fun stop()
 
     fun shutdown()

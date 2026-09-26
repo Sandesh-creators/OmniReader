@@ -26,11 +26,15 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.7.3")
 }
 
-val appVersion = "1.0.1"
+val appVersion = "1.0.2"
 
 compose.desktop {
     application {
         mainClass = "com.omnireader.desktop.MainKt"
+
+        // Compose Desktop otherwise lets the heap grow to a quarter of system
+        // memory, which showed up as a ~1 GB resident app for a reading session.
+        jvmArgs += listOf("-Xmx512m", "-XX:MaxMetaspaceSize=256m")
 
         nativeDistributions {
             targetFormats(TargetFormat.Msi, TargetFormat.Exe)

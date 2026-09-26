@@ -12,6 +12,8 @@ class TtsManager(private val backend: SpeechBackend) {
     private var currentSentenceIndex = 0
     private var interrupted = false
     private var onComplete: (() -> Unit)? = null
+    private var scheduled: Thread? = null
+    private var generation = 0
 
     private val _state = MutableStateFlow(TtsState())
     val state: StateFlow<TtsState> = _state.asStateFlow()
@@ -26,6 +28,8 @@ class TtsManager(private val backend: SpeechBackend) {
         }
         backend.initialize {
             isInitialized = true
+            val name = runCatching { backend.engineName() }.getOrDefault("")
+            if (name.isNotEmpty()) _state.value = _state.value.copy(engineName = name)
             onReady()
         }
     }
@@ -34,6 +38,7 @@ class TtsManager(private val backend: SpeechBackend) {
         if (!isInitialized) return
 
         interrupted = false
+        generation++
         sentences = text.split(Regex("(?<=[.!?])\\s+"))
             .filter { it.isNotBlank() }
             .map { it.trim() }
@@ -49,16 +54,20 @@ class TtsManager(private val backend: SpeechBackend) {
 
     private fun speakSentence(index: Int) {
         if (index >= sentences.size) return
+        val rate = _state.value.speed
+        val pitch = _state.value.pitch
+        val token = generation
+
         backend.speak(
             text = sentences[index],
-            rate = _state.value.speed,
-            pitch = _state.value.pitch,
+            rate = rate,
+            pitch = pitch,
             onDone = {
-                if (interrupted) return@speak
+                if (interrupted || token != generation) return@speak
                 currentSentenceIndex++
                 if (currentSentenceIndex < sentences.size) {
                     _onSentenceHighlight.value = currentSentenceIndex
-                    speakSentence(currentSentenceIndex)
+                    scheduleNextSentence(token)
                 } else {
                     _state.value = _state.value.copy(isPlaying = false, isPaused = false)
                     _onSentenceHighlight.value = -1
@@ -66,13 +75,49 @@ class TtsManager(private val backend: SpeechBackend) {
                 }
             },
             onError = {
+                if (token != generation) return@speak
                 _state.value = _state.value.copy(isPlaying = false, isPaused = false)
             }
         )
+
+        prefetchFollowing(index, token, rate, pitch)
+    }
+
+    /**
+     * Renders the next sentence while the current one is still playing so the
+     * gap between sentences is only the configured pause, not engine start-up.
+     */
+    private fun prefetchFollowing(index: Int, token: Int, rate: Float, pitch: Float) {
+        if (!_state.value.prefetchEnabled) return
+        val next = sentences.getOrNull(index + 1) ?: return
+        runCatching { backend.prefetch(next, rate, pitch) }
+    }
+
+    private fun scheduleNextSentence(token: Int) {
+        val gapMs = (_state.value.sentenceGap.coerceIn(0f, 5f) * 1000f).toLong()
+        if (gapMs <= 0L) {
+            speakSentence(currentSentenceIndex)
+            return
+        }
+        scheduled?.interrupt()
+        val worker = Thread {
+            try {
+                Thread.sleep(gapMs)
+            } catch (_: InterruptedException) {
+                return@Thread
+            }
+            if (!interrupted && token == generation) speakSentence(currentSentenceIndex)
+        }
+        worker.isDaemon = true
+        worker.name = "omnireader-tts-gap"
+        worker.start()
+        scheduled = worker
     }
 
     fun pause() {
         interrupted = true
+        generation++
+        scheduled?.interrupt()
         backend.stop()
         _state.value = _state.value.copy(isPlaying = false, isPaused = true)
     }
@@ -88,10 +133,18 @@ class TtsManager(private val backend: SpeechBackend) {
 
     fun stop() {
         interrupted = true
+        generation++
+        scheduled?.interrupt()
         backend.stop()
         currentSentenceIndex = 0
         sentences = emptyList()
-        _state.value = TtsState(speed = _state.value.speed, pitch = _state.value.pitch)
+        _state.value = TtsState(
+            speed = _state.value.speed,
+            pitch = _state.value.pitch,
+            sentenceGap = _state.value.sentenceGap,
+            prefetchEnabled = _state.value.prefetchEnabled,
+            engineName = _state.value.engineName
+        )
         _onSentenceHighlight.value = -1
     }
 
@@ -103,12 +156,22 @@ class TtsManager(private val backend: SpeechBackend) {
         _state.value = _state.value.copy(pitch = pitch.coerceIn(0.5f, 2.0f))
     }
 
+    fun setSentenceGap(gap: Float) {
+        _state.value = _state.value.copy(sentenceGap = gap.coerceIn(0f, 5f))
+    }
+
+    fun setPrefetchEnabled(enabled: Boolean) {
+        _state.value = _state.value.copy(prefetchEnabled = enabled)
+    }
+
     fun setOnComplete(action: () -> Unit) {
         onComplete = action
     }
 
     fun shutdown() {
         interrupted = true
+        generation++
+        scheduled?.interrupt()
         backend.stop()
         backend.shutdown()
         isInitialized = false

@@ -29,11 +29,16 @@ data class ReadingProgress(
     val scrollPosition: Float = 0f
 )
 
+const val DEFAULT_SENTENCE_GAP = 0.2f
+
 data class TtsState(
     val isPlaying: Boolean = false,
     val isPaused: Boolean = false,
     val speed: Float = 1.0f,
     val pitch: Float = 1.0f,
+    val sentenceGap: Float = DEFAULT_SENTENCE_GAP,
+    val prefetchEnabled: Boolean = true,
+    val engineName: String = "",
     val currentChapterIndex: Int = 0,
     val currentSentenceIndex: Int = 0
 )

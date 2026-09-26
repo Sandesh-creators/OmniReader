@@ -120,6 +120,8 @@ class DefaultAppController(
             runCatching {
                 ttsManager.setSpeed(settings.ttsSpeed)
                 ttsManager.setPitch(settings.ttsPitch)
+                ttsManager.setSentenceGap(settings.ttsSentenceGap)
+                ttsManager.setPrefetchEnabled(settings.ttsPrefetch)
             }
         }
     }
@@ -222,6 +224,16 @@ class DefaultAppController(
     override fun setTtsPitch(pitch: Float) {
         ttsManager.setPitch(pitch)
         scope.launch { settingsManager.saveTtsPitch(pitch) }
+    }
+
+    override fun setTtsSentenceGap(gapSeconds: Float) {
+        ttsManager.setSentenceGap(gapSeconds)
+        scope.launch { settingsManager.saveTtsSentenceGap(gapSeconds) }
+    }
+
+    override fun setTtsPrefetch(enabled: Boolean) {
+        ttsManager.setPrefetchEnabled(enabled)
+        scope.launch { settingsManager.saveTtsPrefetch(enabled) }
     }
 
     override fun setAutoAdvanceChapters(enabled: Boolean) {

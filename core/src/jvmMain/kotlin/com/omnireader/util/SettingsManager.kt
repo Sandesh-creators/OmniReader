@@ -1,10 +1,14 @@
 package com.omnireader.util
 
+import com.omnireader.data.model.DEFAULT_SENTENCE_GAP
+
 data class AppSettings(
     val nightMode: Boolean = false,
     val fontSize: Int = 16,
     val ttsSpeed: Float = 1.0f,
     val ttsPitch: Float = 1.0f,
+    val ttsSentenceGap: Float = DEFAULT_SENTENCE_GAP,
+    val ttsPrefetch: Boolean = true,
     val autoAdvanceChapters: Boolean = true
 )
 
@@ -15,6 +19,8 @@ class SettingsManager(private val store: PreferencesStore) {
         const val FONT_SIZE_KEY = "font_size"
         const val TTS_SPEED_KEY = "tts_speed"
         const val TTS_PITCH_KEY = "tts_pitch"
+        const val TTS_SENTENCE_GAP_KEY = "tts_sentence_gap"
+        const val TTS_PREFETCH_KEY = "tts_prefetch"
         const val AUTO_ADVANCE_KEY = "auto_advance_chapters"
     }
 
@@ -24,6 +30,8 @@ class SettingsManager(private val store: PreferencesStore) {
             fontSize = store.get(FONT_SIZE_KEY)?.toIntOrNull() ?: 16,
             ttsSpeed = store.get(TTS_SPEED_KEY)?.toFloatOrNull() ?: 1.0f,
             ttsPitch = store.get(TTS_PITCH_KEY)?.toFloatOrNull() ?: 1.0f,
+            ttsSentenceGap = store.get(TTS_SENTENCE_GAP_KEY)?.toFloatOrNull() ?: DEFAULT_SENTENCE_GAP,
+            ttsPrefetch = store.get(TTS_PREFETCH_KEY)?.toBooleanStrictOrNull() ?: true,
             autoAdvanceChapters = store.get(AUTO_ADVANCE_KEY)?.toBooleanStrictOrNull() ?: true
         )
     }
@@ -35,6 +43,10 @@ class SettingsManager(private val store: PreferencesStore) {
     suspend fun saveTtsSpeed(speed: Float) = store.put(TTS_SPEED_KEY, speed.toString())
 
     suspend fun saveTtsPitch(pitch: Float) = store.put(TTS_PITCH_KEY, pitch.toString())
+
+    suspend fun saveTtsSentenceGap(gap: Float) = store.put(TTS_SENTENCE_GAP_KEY, gap.toString())
+
+    suspend fun saveTtsPrefetch(enabled: Boolean) = store.put(TTS_PREFETCH_KEY, enabled.toString())
 
     suspend fun saveAutoAdvanceChapters(enabled: Boolean) =
         store.put(AUTO_ADVANCE_KEY, enabled.toString())
